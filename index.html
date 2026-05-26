@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>市场调研分析助手</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{background:#0d0f14;color:#e8ecf5;font-family:'Segoe UI',system-ui,sans-serif;min-height:100vh;}
+  ::-webkit-scrollbar{width:5px;}
+  ::-webkit-scrollbar-thumb{background:#252a38;border-radius:4px;}
+  input,select,textarea{font-family:inherit;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+  @keyframes fadeUp{from{opacity:0;transform:translateY(10px);}to{opacity:1;transform:none;}}
+  @keyframes pulse{0%,100%{opacity:1;}50%{opacity:0.3;}}
+  .fade{animation:fadeUp 0.35s ease both;}
+  .btn:hover{opacity:0.88;transform:translateY(-1px);}
+  .btn{transition:opacity .15s,transform .1s;cursor:pointer;}
+  input:focus,select:focus,textarea:focus{border-color:#3d4562!important;outline:none;}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+
+const C = {
+  bg:"#0d0f14",bgCard:"#13161e",bgInput:"#1a1e28",
+  border:"#252a38",borderHover:"#3d4562",
+  accent:"#4f7cff",accentSoft:"#1e2d5a",
+  teal:"#2ec4b6",tealSoft:"#0d3530",
+  amber:"#f4a544",amberSoft:"#3a2510",
+  coral:"#f06565",coralSoft:"#3a1414",
+  green:"#4ec97a",greenSoft:"#0d2e1a",
+  textPrimary:"#e8ecf5",textSecondary:"#8891aa",textMuted:"#535870",
+};
+
+const FW = {
+  A:{label:"框架A — 单市场销售落地",desc:"已确定目标市场，搞清楚如何卖",color:C.accent,soft:C.accentSoft,
+    modules:["市场环境快照","市场规模 TAM/SAM/SOM","客户画像与决策链","竞品格局分析","渠道与定价策略","落地路径与里程碑"]},
+  B:{label:"框架B — 多区域机会筛选",desc:"多个候选市场，决定先打哪里",color:C.teal,soft:C.tealSoft,
+    modules:["宏观筛选维度设定","候选市场评分对比","各市场深度分析","优先级矩阵","进入时序图","商业模式闭环"]},
+  C:{label:"框架C — 产品竞争力验证",desc:"有产品有市场，验证能否打赢",color:C.amber,soft:C.amberSoft,
+    modules:["客户需求深挖","竞品实测对比","定价敏感度","采购路径验证","交付能力评估","Go/No-Go综合判断"]},
+};
+
+const FIELDS = [
+  {id:"product",label:"产品 / 解决方案",placeholder:"例：CPV聚光光伏系统、工业物联网软件、绿色氢气设备……",type:"text"},
+  {id:"productType",label:"产品类型",type:"select",options:["硬件设备","软件/SaaS","系统集成/EPC","服务/咨询","硬件+软件组合"]},
+  {id:"bModel",label:"商业模式",type:"select",options:["B2B（企业对企业）","B2G（企业对政府）","B2B2C","混合模式"]},
+  {id:"purpose",label:"调研目的",type:"select",options:["进入新市场 — 寻找机会（框架B）","已有目标市场 — 落地销售路径（框架A）","验证产品竞争力 — Go/No-Go（框架C）","不确定，帮我判断"]},
+  {id:"markets",label:"目标市场 / 候选地区",placeholder:"例：美国、澳大利亚、智利、巴西……（可多填）",type:"text"},
+  {id:"industry",label:"目标行业 / 客户类型",placeholder:"例：矿业、数据中心、工业园区……",type:"text"},
+  {id:"existing",label:"已有数据 / 资料（可选）",placeholder:"例：已有竞品列表、行业报告……没有可留空",type:"text"},
+];
+
+function classify(a){
+  const p=a.purpose||"";
+  if(p.includes("框架B")||p.includes("寻找机会"))return"B";
+  if(p.includes("框架A")||p.includes("落地销售"))return"A";
+  if(p.includes("框架C")||p.includes("竞争力"))return"C";
+  const m=(a.markets||"").split(/[，,、\s]+/).filter(Boolean);
+  return m.length>=3?"B":m.length===1?"A":"B";
+}
+
+function buildProbeSystem(a){
+  return`你是一位顶级市场调研战略分析师，当前任务是通过精准追问深度理解用户真实需求。
+
+用户已填写信息：
+- 产品：${a.product||"未填写"} | 类型：${a.productType||"未选"} | 模式：${a.bModel||"未选"}
+- 目的：${a.purpose||"未选"} | 市场：${a.markets||"未填"} | 行业：${a.industry||"未填"}
+- 已有资料：${a.existing||"无"}
+
+追问原则：
+1. 每次只问1个最核心关键的问题，严禁一次问多个
+2. 问题具体有针对性，不问泛泛开放题
+3. 每次追问后评估理解置信度（0-100%）
+4. 置信度≥95%时停止追问，输出需求理解总结
+5. 优先追问：真实决策背景、核心痛点、成功标准、时间压力、资源约束、已踩的坑
+
+置信度维度（各20分，合计100分）：
+- 真实业务背景和动机
+- 核心决策问题（报告帮助做什么决定）
+- 成功标准（什么结论才算有用）
+- 资源与约束（预算/时间/能力边界）
+- 已有认知和盲点
+
+严格输出JSON格式（不加任何额外说明和markdown）：
+{"confidence":数字,"question":"追问文字","questionContext":"一句话说明为何问这个","summary":"总结（仅≥95%时填写，否则空字符串）","ready":布尔值}`;
+}
+
+function buildAnalysisPrompt(a,fw,history){
+  const qa=history.length>0?"\n\n【追问对话记录（重要背景）】\n"+history.map(h=>`Q: ${h.question}\nA: ${h.answer}`).join("\n\n"):"";
+  const f=FW[fw];
+  return`你是一位顶级市场调研战略分析师，基于以下信息生成深度分析报告。
+
+【调研信息】
+产品：${a.product||"未填"} | 类型：${a.productType||""} | 模式：${a.bModel||""}
+目标市场：${a.markets||"未指定"} | 行业：${a.industry||"未指定"} | 已有资料：${a.existing||"无"}${qa}
+
+【分析框架】${f.label}
+严格按以下6个模块输出：
+${f.modules.map((m,i)=>`${i+1}. ${m}`).join("\n")}
+
+每模块必须包含：
+① 核心发现（3-5条，战略洞察优先于信息罗列）
+② 量化数据（TAM/SAM/SOM或关键数字，注明来源：一手访谈/权威报告/推断估算）
+③ 关键决策人画像（职位+核心关注点+决策触发条件+反对理由预判）
+④ 可行动建议（具体到"谁做什么何时如何验证"）
+
+竞品分析必须包含"非对称打击点"——找我们能赢的不对称优势，不是简单列优缺点。
+市场规模必须分TAM→SAM→SOM三层，说明每层筛选标准和假设条件。
+
+最后输出【执行摘要】：
+- 最大机会（1句话，具体到市场+场景+规模量级）
+- 最快路径（第一步具体是什么，找谁，谈什么）
+- 最高风险（最可能导致失败的单一因素）
+- 优先级排序（市场/客户类型/行动序列）
+
+重要：如需最新权威数据，请主动搜索后引用并注明来源。`;
+}
+
+async function callProbe(apiKey, system, messages){
+  const res=await fetch("https://api.anthropic.com/v1/messages",{
+    method:"POST",
+    headers:{"Content-Type":"application/json","x-api-key":apiKey,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},
+    body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:800,system,messages}),
+  });
+  if(!res.ok){const e=await res.json();throw new Error(e.error?.message||`API错误 ${res.status}`);}
+  const data=await res.json();
+  const text=data.content?.map(b=>b.text||"").join("")||"";
+  const clean=text.replace(/```json\s*/gi,"").replace(/```/g,"").trim();
+  return JSON.parse(clean);
+}
+
+async function streamAnalysis(apiKey, prompt, onChunk, onSearch, onDone, onError){
+  try{
+    const res=await fetch("https://api.anthropic.com/v1/messages",{
+      method:"POST",
+      headers:{"Content-Type":"application/json","x-api-key":apiKey,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},
+      body:JSON.stringify({
+        model:"claude-sonnet-4-20250514",max_tokens:8000,stream:true,
+        tools:[{type:"web_search_20250305",name:"web_search"}],
+        messages:[{role:"user",content:prompt}],
+      }),
+    });
+    if(!res.ok){const e=await res.json();throw new Error(e.error?.message||`API错误 ${res.status}`);}
+    const reader=res.body.getReader(),decoder=new TextDecoder();
+    let buf="";
+    while(true){
+      const{done,value}=await reader.read();
+      if(done)break;
+      buf+=decoder.decode(value,{stream:true});
+      const lines=buf.split("\n");buf=lines.pop();
+      for(const line of lines){
+        if(!line.startsWith("data: "))continue;
+        const raw=line.slice(6).trim();
+        if(raw==="[DONE]"){onDone();return;}
+        try{
+          const evt=JSON.parse(raw);
+          if(evt.type==="content_block_start"&&evt.content_block?.type==="tool_use")onSearch(true);
+          if(evt.type==="content_block_stop"&&evt.index>0)onSearch(false);
+          if(evt.type==="content_block_delta"&&evt.delta?.type==="text_delta")onChunk(evt.delta.text);
+        }catch{}
+      }
+    }
+    onDone();
+  }catch(e){onError(e.message);}
+}
+
+// ── UI Components ──
+function Spinner({color,size=14}){
+  return React.createElement("span",{style:{display:"inline-block",width:size,height:size,verticalAlign:"middle"}},
+    React.createElement("svg",{viewBox:"0 0 16 16",style:{animation:"spin 0.8s linear infinite",display:"block"}},
+      React.createElement("circle",{cx:8,cy:8,r:6,fill:"none",stroke:color||C.accent,strokeWidth:2.5,strokeDasharray:28,strokeDashoffset:10,strokeLinecap:"round"})
+    )
+  );
+}
+
+function ConfidenceMeter({value}){
+  const pct=Math.min(100,Math.max(0,value));
+  const color=pct>=95?C.green:pct>=70?C.amber:C.accent;
+  return(
+    <div style={{display:"flex",alignItems:"center",gap:10}}>
+      <div style={{flex:1,height:5,borderRadius:4,background:C.border,overflow:"hidden"}}>
+        <div style={{height:"100%",width:`${pct}%`,background:color,borderRadius:4,transition:"width 0.6s ease"}}/>
+      </div>
+      <span style={{fontSize:12,color,fontWeight:700,minWidth:38}}>{pct}%</span>
+      <span style={{fontSize:11,color:C.textMuted}}>{pct>=95?"✓ 对齐完成":"需求对齐中"}</span>
+    </div>
+  );
+}
+
+function FWCard({id,selected,onClick}){
+  const f=FW[id];
+  return(
+    <div onClick={onClick} style={{border:`1.5px solid ${selected?f.color:C.border}`,borderRadius:12,padding:"12px 16px",cursor:"pointer",background:selected?f.soft:C.bgCard,transition:"all 0.18s",flex:1,minWidth:160}}>
+      <div style={{fontSize:11,color:f.color,fontWeight:700,marginBottom:3}}>{f.label}</div>
+      <div style={{fontSize:11,color:C.textSecondary}}>{f.desc}</div>
+    </div>
+  );
+}
+
+function Bubble({role,text,loading}){
+  const isAI=role==="ai";
+  return(
+    <div style={{display:"flex",flexDirection:isAI?"row":"row-reverse",gap:10,marginBottom:14,alignItems:"flex-start"}}>
+      <div style={{width:28,height:28,borderRadius:8,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,background:isAI?C.accentSoft:C.bgInput,border:`1px solid ${isAI?C.accent+"40":C.border}`}}>
+        {isAI?"◈":"你"}
+      </div>
+      <div style={{maxWidth:"82%",padding:"11px 15px",borderRadius:isAI?"4px 12px 12px 12px":"12px 4px 12px 12px",background:isAI?C.bgCard:C.bgInput,border:`1px solid ${isAI?C.border:C.borderHover}`,fontSize:13.5,lineHeight:1.75,color:C.textPrimary,whiteSpace:"pre-wrap"}}>
+        {loading?<span style={{color:C.textMuted,display:"flex",alignItems:"center",gap:8}}><Spinner/>思考中…</span>:text}
+      </div>
+    </div>
+  );
+}
+
+// ── Main App ──
+function App(){
+  const[step,setStep]=React.useState("apikey");
+  const[apiKey,setApiKey]=React.useState(()=>localStorage.getItem("mra_key")||"");
+  const[keyVisible,setKeyVisible]=React.useState(false);
+  const[answers,setAnswers]=React.useState({});
+  const[chosenFW,setChosenFW]=React.useState(null);
+  const[probeHistory,setProbeHistory]=React.useState([]);
+  const[curQ,setCurQ]=React.useState(null);
+  const[curCtx,setCurCtx]=React.useState("");
+  const[confidence,setConfidence]=React.useState(0);
+  const[userInput,setUserInput]=React.useState("");
+  const[probeLoading,setProbeLoading]=React.useState(false);
+  const[summary,setSummary]=React.useState("");
+  const[output,setOutput]=React.useState("");
+  const[searching,setSearching]=React.useState(false);
+  const[error,setError]=React.useState("");
+  const outRef=React.useRef(null);
+  const chatEndRef=React.useRef(null);
+
+  React.useEffect(()=>{outRef.current?.scrollTo({top:outRef.current.scrollHeight,behavior:"smooth"});},[output]);
+  React.useEffect(()=>{chatEndRef.current?.scrollIntoView({behavior:"smooth"});},[probeHistory,curQ,probeLoading]);
+
+  function saveKey(k){setApiKey(k);localStorage.setItem("mra_key",k);}
+  function handleKeySubmit(e){e.preventDefault();if(apiKey.trim().startsWith("sk-ant-"))setStep("intake");else setError("API Key 格式不正确，应以 sk-ant- 开头");}
+  function handleIntake(e){e.preventDefault();setChosenFW(classify(answers));setStep("mode");}
+
+  async function startProbe(history){
+    setProbeLoading(true);
+    const sys=buildProbeSystem(answers);
+    const msgs=history.length===0
+      ?[{role:"user",content:"请开始追问。"}]
+      :[{role:"user",content:"请开始追问。"},
+        ...history.flatMap(h=>[
+          {role:"assistant",content:JSON.stringify({confidence:h.confidence,question:h.question,questionContext:"",summary:"",ready:false})},
+          {role:"user",content:`我的回答：${h.answer}\n请继续追问或输出总结。`}
+        ])
+      ];
+    try{
+      const r=await callProbe(apiKey,sys,msgs);
+      setConfidence(r.confidence);
+      if(r.ready){setSummary(r.summary);setStep("probe-done");}
+      else{setCurQ(r.question);setCurCtx(r.questionContext);}
+    }catch(e){
+      setCurQ("请描述这次调研最希望帮助你做哪个具体决定？");
+      setCurCtx("了解核心决策问题是最重要的起点");
+      setError("追问API调用出错，使用默认问题继续："+e.message);
+    }
+    setProbeLoading(false);
+  }
+
+  async function handleAnswer(){
+    if(!userInput.trim())return;
+    const h=[...probeHistory,{question:curQ,answer:userInput.trim(),confidence}];
+    setProbeHistory(h);setUserInput("");setCurQ(null);
+    await startProbe(h);
+  }
+
+  function handleRun(){
+    setStep("running");setOutput("");setError("");setSearching(false);
+    const prompt=buildAnalysisPrompt(answers,chosenFW,probeHistory);
+    streamAnalysis(apiKey,prompt,
+      chunk=>setOutput(p=>p+chunk),
+      s=>setSearching(s),
+      ()=>setStep("done"),
+      msg=>{setError(msg);setStep("done");}
+    );
+  }
+
+  function reset(){setStep("intake");setAnswers({});setChosenFW(null);setProbeHistory([]);setCurQ(null);setConfidence(0);setOutput("");setError("");setSummary("");}
+
+  const fw=chosenFW?FW[chosenFW]:null;
+
+  // ── Header ──
+  const Header=()=>(
+    <div style={{borderBottom:`1px solid ${C.border}`,padding:"16px 28px",display:"flex",alignItems:"center",gap:12,background:C.bgCard,position:"sticky",top:0,zIndex:10}}>
+      <div style={{width:32,height:32,borderRadius:8,background:`linear-gradient(135deg,${C.accent},${C.teal})`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:15}}>◈</div>
+      <div>
+        <div style={{fontWeight:800,fontSize:15,letterSpacing:"-0.01em"}}>市场调研分析助手</div>
+        <div style={{fontSize:10,color:C.textMuted,marginTop:1}}>智能追问对齐 · 框架匹配 · 深度报告生成</div>
+      </div>
+      {step!=="apikey"&&(
+        <div style={{marginLeft:"auto",display:"flex",gap:8,alignItems:"center"}}>
+          <span style={{fontSize:10,color:C.green}}>● API已连接</span>
+          <button onClick={()=>{setStep("apikey");setError("");}} style={{padding:"4px 10px",borderRadius:6,border:`1px solid ${C.border}`,background:"transparent",color:C.textMuted,cursor:"pointer",fontSize:10}}>换Key</button>
+        </div>
+      )}
+    </div>
+  );
+
+  const Wrap=({children})=>(
+    <div style={{minHeight:"100vh",background:C.bg}}>
+      <Header/>
+      <div style={{maxWidth:740,margin:"0 auto",padding:"32px 20px 60px"}}>{children}</div>
+    </div>
+  );
+
+  // ── Step: API Key ──
+  if(step==="apikey") return(
+    <Wrap>
+      <div className="fade">
+        <div style={{marginBottom:28}}>
+          <div style={{fontWeight:800,fontSize:20,marginBottom:8}}>输入 Anthropic API Key</div>
+          <div style={{color:C.textSecondary,fontSize:13,lineHeight:1.7}}>
+            首次使用需要填入 API Key，之后会自动记住。<br/>
+            没有的话请前往 <a href="https://console.anthropic.com" target="_blank" style={{color:C.accent}}>console.anthropic.com</a> 注册，充值 $5 即可使用。
+          </div>
+        </div>
+
+        <div style={{background:C.bgCard,border:`1px solid ${C.border}`,borderRadius:14,padding:20,marginBottom:20,fontSize:12,color:C.textSecondary,lineHeight:1.8}}>
+          <div style={{color:C.amber,fontWeight:700,marginBottom:8,fontSize:11}}>⚠ 安全提示</div>
+          <div>API Key 仅保存在你本机浏览器的 localStorage 中，不会上传到任何服务器。</div>
+          <div>建议在 Anthropic Console 为这个 Key 设置用量上限，防止超额消费。</div>
+          <div style={{marginTop:8}}>费用参考：每次完整调研约消耗 $0.01~0.05，$5 可用 100~500 次。</div>
+        </div>
+
+        {error&&<div style={{padding:12,borderRadius:10,background:C.coralSoft,border:`1px solid ${C.coral}40`,color:C.coral,fontSize:12,marginBottom:16}}>{error}</div>}
+
+        <form onSubmit={handleKeySubmit}>
+          <label style={{display:"block",fontSize:11,color:C.textSecondary,marginBottom:8,fontWeight:600}}>API Key</label>
+          <div style={{display:"flex",gap:8,marginBottom:20}}>
+            <input
+              type={keyVisible?"text":"password"}
+              value={apiKey}
+              onChange={e=>saveKey(e.target.value)}
+              placeholder="sk-ant-api03-xxxxxxxx……"
+              style={{flex:1,padding:"12px 14px",borderRadius:10,background:C.bgInput,border:`1px solid ${C.border}`,color:C.textPrimary,fontSize:13}}
+            />
+            <button type="button" onClick={()=>setKeyVisible(v=>!v)} style={{padding:"12px 16px",borderRadius:10,border:`1px solid ${C.border}`,background:C.bgInput,color:C.textSecondary,cursor:"pointer",fontSize:12}}>
+              {keyVisible?"隐藏":"显示"}
+            </button>
+          </div>
+          <button type="submit" className="btn" style={{width:"100%",padding:"13px",borderRadius:12,border:"none",background:`linear-gradient(135deg,${C.accent},#6a5aff)`,color:"#fff",fontWeight:700,fontSize:14}}>
+            连接并开始使用 →
+          </button>
+        </form>
+
+        <div style={{marginTop:24,padding:16,background:C.bgCard,border:`1px solid ${C.border}`,borderRadius:12,fontSize:12,color:C.textMuted,lineHeight:1.8}}>
+          <div style={{color:C.textSecondary,fontWeight:600,marginBottom:8}}>如何获取 API Key（约5分钟）</div>
+          <div>1. 访问 console.anthropic.com → 注册账号</div>
+          <div>2. 左侧菜单 → API Keys → Create Key</div>
+          <div>3. 复制 Key（只显示一次，请妥善保存）</div>
+          <div>4. 左侧菜单 → Billing → 充值 $5 起</div>
+        </div>
+      </div>
+    </Wrap>
+  );
+
+  // ── Step: Intake ──
+  if(step==="intake") return(
+    <Wrap>
+      <form className="fade" onSubmit={handleIntake}>
+        <div style={{marginBottom:24}}>
+          <div style={{fontWeight:800,fontSize:20,marginBottom:6}}>填写调研基本信息</div>
+          <div style={{color:C.textSecondary,fontSize:12}}>约30秒 · 系统自动识别分析框架</div>
+        </div>
+        {FIELDS.map((f,i)=>(
+          <div key={f.id} style={{marginBottom:16,animation:`fadeUp 0.3s ease ${i*0.04}s both`}}>
+            <label style={{display:"block",fontSize:11,color:C.textSecondary,marginBottom:7,fontWeight:600,letterSpacing:"0.04em"}}>{f.label}</label>
+            {f.type==="select"?(
+              <select value={answers[f.id]||""} onChange={e=>setAnswers(a=>({...a,[f.id]:e.target.value}))}
+                style={{width:"100%",padding:"11px 14px",borderRadius:10,background:C.bgInput,border:`1px solid ${C.border}`,color:answers[f.id]?C.textPrimary:C.textMuted,fontSize:13,appearance:"none",cursor:"pointer"}}>
+                <option value="">请选择……</option>
+                {f.options.map(o=><option key={o} value={o}>{o}</option>)}
+              </select>
+            ):(
+              <input type="text" value={answers[f.id]||""} onChange={e=>setAnswers(a=>({...a,[f.id]:e.target.value}))} placeholder={f.placeholder}
+                style={{width:"100%",padding:"11px 14px",borderRadius:10,background:C.bgInput,border:`1px solid ${C.border}`,color:C.textPrimary,fontSize:13}}/>
+            )}
+          </div>
+        ))}
+        <button type="submit" className="btn" style={{marginTop:8,width:"100%",padding:"13px",borderRadius:12,border:"none",background:`linear-gradient(135deg,${C.accent},#6a5aff)`,color:"#fff",fontWeight:700,fontSize:14}}>
+          下一步 →
+        </button>
+      </form>
+    </Wrap>
+  );
+
+  // ── Step: Mode ──
+  if(step==="mode"&&fw) return(
+    <Wrap>
+      <div className="fade">
+        <div style={{marginBottom:22}}>
+          <div style={{fontSize:11,color:C.textSecondary,marginBottom:5}}>选择分析模式</div>
+          <div style={{fontWeight:800,fontSize:20,marginBottom:4}}>如何开始这次调研？</div>
+          <div style={{fontSize:12,color:C.textMuted}}>已识别框架：<span style={{color:fw.color,fontWeight:600}}>{fw.label}</span></div>
+        </div>
+
+        <div onClick={()=>{setStep("probing");startProbe([]);}} style={{border:`1.5px solid ${C.accent}`,borderRadius:14,padding:22,cursor:"pointer",background:C.bgCard,marginBottom:12,transition:"all 0.15s"}}>
+          <div style={{display:"flex",gap:14,alignItems:"flex-start"}}>
+            <div style={{width:38,height:38,borderRadius:10,background:C.accentSoft,border:`1px solid ${C.accent}40`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:17,flexShrink:0}}>◎</div>
+            <div>
+              <div style={{fontWeight:700,fontSize:14,color:C.accent,marginBottom:5}}>追问模式（推荐）</div>
+              <div style={{fontSize:12,color:C.textSecondary,lineHeight:1.7}}>AI通过精准追问深度对齐你的真实需求（每次只问1个关键问题），置信度达95%后结合最新权威资料生成高质量报告。</div>
+              <div style={{marginTop:10,display:"flex",gap:6,flexWrap:"wrap"}}>
+                {["需求精准对齐","减少幻觉风险","报告质量更高","3-5轮追问"].map(t=>(
+                  <span key={t} style={{padding:"2px 9px",borderRadius:20,fontSize:10,background:C.accentSoft,color:C.accent,border:`1px solid ${C.accent}30`}}>{t}</span>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div onClick={()=>setStep("confirm")} style={{border:`1px solid ${C.border}`,borderRadius:14,padding:22,cursor:"pointer",background:C.bgCard,transition:"all 0.15s"}}>
+          <div style={{display:"flex",gap:14,alignItems:"flex-start"}}>
+            <div style={{width:38,height:38,borderRadius:10,background:C.bgInput,border:`1px solid ${C.border}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:17,flexShrink:0,color:C.textMuted}}>▶</div>
+            <div>
+              <div style={{fontWeight:700,fontSize:14,color:C.textSecondary,marginBottom:5}}>直接生成模式</div>
+              <div style={{fontSize:12,color:C.textMuted,lineHeight:1.7}}>基于已填信息直接生成报告，适合需求已非常明确的情况。</div>
+            </div>
+          </div>
+        </div>
+
+        <button onClick={()=>setStep("intake")} style={{marginTop:14,width:"100%",padding:"10px",borderRadius:10,border:`1px solid ${C.border}`,background:"transparent",color:C.textMuted,cursor:"pointer",fontSize:11}}>← 修改信息</button>
+      </div>
+    </Wrap>
+  );
+
+  // ── Step: Probing ──
+  if(step==="probing") return(
+    <Wrap>
+      <div className="fade">
+        <div style={{marginBottom:18}}>
+          <div style={{fontWeight:700,fontSize:16,marginBottom:10}}>需求对齐追问</div>
+          <ConfidenceMeter value={confidence}/>
+        </div>
+        <div style={{minHeight:180,maxHeight:"46vh",overflowY:"auto",marginBottom:14,paddingRight:4}}>
+          {probeHistory.map((h,i)=>(
+            <div key={i}>
+              <Bubble role="ai" text={h.question}/>
+              <Bubble role="user" text={h.answer}/>
+            </div>
+          ))}
+          {curQ&&!probeLoading&&(
+            <>
+              <Bubble role="ai" text={curQ}/>
+              {curCtx&&<div style={{marginLeft:38,marginTop:-8,marginBottom:12,fontSize:11,color:C.textMuted,fontStyle:"italic"}}>↳ {curCtx}</div>}
+            </>
+          )}
+          {probeLoading&&<Bubble role="ai" loading={true}/>}
+          <div ref={chatEndRef}/>
+        </div>
+        {curQ&&!probeLoading&&(
+          <div style={{display:"flex",gap:10,alignItems:"flex-end"}}>
+            <textarea value={userInput} onChange={e=>setUserInput(e.target.value)}
+              onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();handleAnswer();}}}
+              placeholder="输入你的回答… (Enter发送，Shift+Enter换行)" rows={3}
+              style={{flex:1,padding:"11px 13px",borderRadius:10,background:C.bgInput,border:`1px solid ${C.border}`,color:C.textPrimary,fontSize:13,resize:"none",lineHeight:1.6}}/>
+            <button onClick={handleAnswer} disabled={!userInput.trim()} className="btn"
+              style={{padding:"11px 18px",borderRadius:10,border:"none",cursor:userInput.trim()?"pointer":"not-allowed",background:userInput.trim()?`linear-gradient(135deg,${C.accent},#6a5aff)`:C.bgInput,color:userInput.trim()?"#fff":C.textMuted,fontWeight:700,fontSize:13,whiteSpace:"nowrap"}}>
+              回答 →
+            </button>
+          </div>
+        )}
+        {error&&<div style={{marginTop:10,padding:10,borderRadius:8,background:C.coralSoft,color:C.coral,fontSize:11}}>{error}</div>}
+        <button onClick={()=>setStep("confirm")} style={{marginTop:10,width:"100%",padding:"9px",borderRadius:8,border:`1px solid ${C.border}`,background:"transparent",color:C.textMuted,cursor:"pointer",fontSize:11}}>
+          跳过追问，直接生成
+        </button>
+      </div>
+    </Wrap>
+  );
+
+  // ── Step: Probe Done ──
+  if(step==="probe-done") return(
+    <Wrap>
+      <div className="fade">
+        <div style={{marginBottom:18}}>
+          <div style={{fontWeight:700,fontSize:16,marginBottom:10}}>需求对齐完成</div>
+          <ConfidenceMeter value={confidence}/>
+        </div>
+        <div style={{background:C.greenSoft,border:`1px solid ${C.green}40`,borderRadius:14,padding:18,marginBottom:18}}>
+          <div style={{fontSize:11,color:C.green,fontWeight:700,marginBottom:8}}>✓ AI 对你需求的理解总结</div>
+          <div style={{fontSize:13,color:C.textPrimary,lineHeight:1.8,whiteSpace:"pre-wrap"}}>{summary}</div>
+        </div>
+        {probeHistory.length>0&&(
+          <div style={{background:C.bgCard,border:`1px solid ${C.border}`,borderRadius:12,padding:16,marginBottom:18}}>
+            <div style={{fontSize:11,color:C.textMuted,marginBottom:10,fontWeight:600}}>追问记录（{probeHistory.length}轮）</div>
+            {probeHistory.map((h,i)=>(
+              <div key={i} style={{marginBottom:i<probeHistory.length-1?12:0}}>
+                <div style={{fontSize:11,color:C.accent,marginBottom:3}}>Q{i+1}: {h.question}</div>
+                <div style={{fontSize:12,color:C.textSecondary,paddingLeft:12,borderLeft:`2px solid ${C.border}`}}>{h.answer}</div>
+              </div>
+            ))}
+          </div>
+        )}
+        <div style={{marginBottom:18}}>
+          <div style={{fontSize:11,color:C.textMuted,marginBottom:10}}>确认分析框架（可切换）</div>
+          <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
+            {["A","B","C"].map(id=><FWCard key={id} id={id} selected={chosenFW===id} onClick={()=>setChosenFW(id)}/>)}
+          </div>
+        </div>
+        <button onClick={handleRun} className="btn" style={{width:"100%",padding:"14px",borderRadius:12,border:"none",cursor:"pointer",background:fw?`linear-gradient(135deg,${fw.color},${fw.color}cc)`:`linear-gradient(135deg,${C.accent},#6a5aff)`,color:"#000",fontWeight:700,fontSize:14}}>
+          基于对齐需求生成深度分析报告 ↗
+        </button>
+      </div>
+    </Wrap>
+  );
+
+  // ── Step: Confirm (direct) ──
+  if(step==="confirm"&&fw) return(
+    <Wrap>
+      <div className="fade">
+        <div style={{marginBottom:22}}>
+          <div style={{fontSize:11,color:C.textSecondary,marginBottom:5}}>确认配置</div>
+          <div style={{fontWeight:800,fontSize:20}}>匹配的分析框架</div>
+        </div>
+        <div style={{display:"flex",gap:10,flexWrap:"wrap",marginBottom:18}}>
+          {["A","B","C"].map(id=><FWCard key={id} id={id} selected={chosenFW===id} onClick={()=>setChosenFW(id)}/>)}
+        </div>
+        <div style={{background:C.bgCard,border:`1px solid ${fw.color}40`,borderRadius:14,padding:18,marginBottom:18}}>
+          <div style={{fontSize:11,color:fw.color,fontWeight:700,marginBottom:12}}>{fw.label} — 分析模块</div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+            {fw.modules.map((m,i)=>(
+              <div key={m} style={{display:"flex",gap:8,alignItems:"flex-start",padding:"8px 11px",borderRadius:8,background:fw.soft,border:`1px solid ${fw.color}20`}}>
+                <span style={{color:fw.color,fontWeight:700,fontSize:11,minWidth:14}}>{i+1}</span>
+                <span style={{fontSize:12,color:C.textPrimary}}>{m}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div style={{display:"flex",gap:10}}>
+          <button onClick={()=>setStep("mode")} style={{flex:1,padding:"11px",borderRadius:10,border:`1px solid ${C.border}`,background:"transparent",color:C.textSecondary,cursor:"pointer",fontSize:13}}>← 返回</button>
+          <button onClick={handleRun} className="btn" style={{flex:2,padding:"11px",borderRadius:10,border:"none",cursor:"pointer",background:`linear-gradient(135deg,${fw.color},${fw.color}cc)`,color:"#000",fontWeight:700,fontSize:14}}>
+            生成深度分析报告 ↗
+          </button>
+        </div>
+      </div>
+    </Wrap>
+  );
+
+  // ── Step: Running / Done ──
+  if((step==="running"||step==="done")&&fw) return(
+    <Wrap>
+      <div className="fade">
+        <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:18,padding:"12px 16px",background:C.bgCard,borderRadius:12,border:`1px solid ${step==="done"?fw.color+"60":C.border}`}}>
+          {step==="running"?<Spinner color={fw.color}/>:<span style={{color:fw.color,fontSize:15}}>✓</span>}
+          <div style={{flex:1}}>
+            <div style={{fontWeight:700,fontSize:13,color:fw.color}}>
+              {step==="running"?(searching?"正在搜索最新市场数据…":"正在生成深度分析报告…"):"报告生成完成"}
+            </div>
+            <div style={{fontSize:10,color:C.textMuted,marginTop:1}}>
+              {fw.label} · {probeHistory.length>0?`${probeHistory.length}轮追问 · `:"直接生成 · "}{answers.markets||"目标市场"}
+            </div>
+          </div>
+          {step==="done"&&(
+            <button onClick={reset} style={{padding:"6px 12px",borderRadius:8,border:`1px solid ${C.border}`,background:"transparent",color:C.textSecondary,cursor:"pointer",fontSize:11}}>
+              新建调研 ↺
+            </button>
+          )}
+        </div>
+
+        {error&&<div style={{padding:12,borderRadius:10,background:C.coralSoft,border:`1px solid ${C.coral}40`,color:C.coral,fontSize:12,marginBottom:12}}>⚠ {error}</div>}
+
+        <div ref={outRef} style={{background:C.bgCard,border:`1px solid ${C.border}`,borderRadius:14,padding:"22px 26px",maxHeight:"62vh",overflowY:"auto",fontSize:13.5,lineHeight:1.9,color:C.textPrimary,whiteSpace:"pre-wrap",wordBreak:"break-word"}}>
+          {output||<span style={{color:C.textMuted}}>正在思考分析框架…</span>}
+          {step==="running"&&<span style={{display:"inline-block",width:2,height:15,background:fw.color,marginLeft:2,animation:"pulse 0.9s steps(2) infinite",verticalAlign:"middle"}}/>}
+        </div>
+
+        <div style={{marginTop:12,display:"flex",gap:6,flexWrap:"wrap"}}>
+          {fw.modules.map((m,i)=>{
+            const on=output.length>(i+1)*400;
+            return<div key={m} style={{padding:"3px 10px",borderRadius:20,fontSize:10,border:`1px solid ${on?fw.color+"80":C.border}`,color:on?fw.color:C.textMuted,background:on?fw.soft:"transparent",transition:"all 0.5s"}}>{i+1}. {m}</div>;
+          })}
+        </div>
+      </div>
+    </Wrap>
+  );
+
+  return<Wrap><div style={{color:C.textMuted,fontSize:13}}>加载中…</div></Wrap>;
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
+</script>
+</body>
+</html>
